@@ -9,19 +9,45 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Duration;
+import java.time.Instant;
 
 public class JsonLoader {
 
     private static final String BASE_URL = "https://www.dnd5eapi.co";
     private final HttpClient client = HttpClient.newHttpClient();
 
-    public void writeToIndex(String rawJson, String filePath) {
+    // ONE place that defines where the Resources folder lives.
+    // Every read/write in this class uses this — no bare filenames anywhere else.
+    private static final Path RESOURCES_DIR =
+            Path.of(System.getProperty("user.dir"), "src", "main", "Resources");
+
+    public static final Path INDEX_FILE = RESOURCES_DIR.resolve("Index.json");
+    public static final Path DATA_FILE = RESOURCES_DIR.resolve("Data.json");
+
+    public boolean isStale(Path filePath, Duration maxAge) {
+        if (!Files.exists(filePath)) {
+            return true;
+        }
+
+        try {
+            FileTime lastModified = Files.getLastModifiedTime(filePath);
+            Instant cutoff = Instant.now().minus(maxAge);
+            return lastModified.toInstant().isBefore(cutoff);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return true;
+        }
+    }
+
+    public void writeToIndex(String rawJson, Path filePath) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
         try {
             JsonElement parsed = JsonParser.parseString(rawJson);
 
-            try (FileWriter writer = new FileWriter(filePath)) {
+            try (FileWriter writer = new FileWriter(filePath.toFile())) {
                 gson.toJson(parsed, writer);
                 System.out.println("Saved to " + filePath);
             }
@@ -41,13 +67,11 @@ public class JsonLoader {
         return response.body();
     }
 
-    // CHANGED: takes the INPUT list path and the OUTPUT path as two separate parameters
-    public JsonArray writeToMonster(String indexFilePath, String outputFilePath) {
+    public JsonArray writeToMonster(Path indexFilePath, Path outputFilePath) {
         JsonArray allMonsters = new JsonArray();
 
         try {
-            // CHANGED: uses the parameter instead of a hardcoded filename
-            String listJson = Files.readString(Path.of(indexFilePath));
+            String listJson = Files.readString(indexFilePath);
             JsonObject listObject = JsonParser.parseString(listJson).getAsJsonObject();
             JsonArray results = listObject.getAsJsonArray("results");
 
@@ -65,17 +89,15 @@ public class JsonLoader {
             }
 
         } catch (IOException e) {
-            // This is the NoSuchFileException case — the index file itself was missing/unreadable
             System.out.println("Could not read index file: " + indexFilePath);
             e.printStackTrace();
-            return allMonsters; // bail out early, nothing to write
+            return allMonsters;
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        // ADDED: actually write the accumulated array out, using outputFilePath
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try (FileWriter writer = new FileWriter(outputFilePath)) {
+        try (FileWriter writer = new FileWriter(outputFilePath.toFile())) {
             gson.toJson(allMonsters, writer);
             System.out.println("Saved to " + outputFilePath);
         } catch (IOException e) {
