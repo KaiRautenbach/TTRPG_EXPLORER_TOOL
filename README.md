@@ -1,100 +1,76 @@
-markdown_content = """# D&D 5e Bestiary ETL Pipeline
+File Structure:
 
-![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
-![Maven](https://img.shields.io/badge/Maven-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
-![JUnit5](https://img.shields.io/badge/JUnit5-25A162?style=for-the-badge&logo=junit5&logoColor=white)
+pocket-bestiary/
+├── pom.xml
+├── src/main/java/com/yourname/bestiary/
+│   ├── Main.java
+│   ├── model/
+│   │   ├── Monster.java
+│   │   ├── ActionEntry.java
+│   │   └── SpecialAbility.java
+│   ├── api/
+│   │   ├── DndApiClient.java      // HTTP calls to dnd5eapi.co
+│   │   └── ConnectivityChecker.java
+│   ├── db/
+│   │   ├── DatabaseManager.java   // connection, schema init
+│   │   └── MonsterDao.java        // insert/update/query
+│   ├── sync/
+│   │   └── SyncService.java       // orchestrates: check online -> fetch -> diff -> upsert
+│   └── ui/
+│       └── MainController.java    // (once you're on JavaFX)
+└── bestiary.db                    // created at runtime
 
-A lightweight, local Data Engineering pipeline built to demonstrate core **ETL (Extract, Transform, Load)** principles. This project ingests raw monster data from the public D&D 5e API, normalizes the chaotic JSON structures, and loads the cleaned data into a local relational database.
 
-## Project Goals
 
-This repository serves as a practical introduction to data engineering workflows, bridging the gap between standard software development and data infrastructure.
+That's a clean, fully successful deserialization — every layer of your model worked correctly end-to-end: top-level fields (name, hitPoints, challengeRating), the nested list (armorClass.get(0).getValue()), the nested object (senses.getDarkVision()), and even reaching into a list of a nested class's own field (actions.get(0).getName()). That last one in particular confirms ActionEntry and its chain down to SubAction/Damage/Dc/Usage are all wired correctly, since a broken piece anywhere in that chain would've thrown rather than printed clean.
 
-The primary objectives are:
-1. **Master the ETL Pattern:** Build a robust, sequential pipeline that extracts data from a remote source, transforms it in-memory, and loads it into persistent storage.
-2. **Handle Messy Data:** Parse deeply nested, inconsistent JSON payloads from external APIs and flatten them into clean, structured Object-Oriented models.
-3. **Pipeline Resilience:** Write comprehensive unit tests to ensure the transformation logic doesn't break when encountering edge cases (e.g., missing fields like a monster lacking a "swim speed").
-4. **Local Database Integration:** Learn to interact with a lightweight relational database (SQLite) using JDBC without needing to provision cloud infrastructure.
+This is a genuinely good checkpoint — worth pausing on for a second. You went from "what even is a POJO" to a fully working multi-class deserialization pipeline for one of the most nested, irregular JSON shapes in the whole dataset. The aboleth was a good torture test — if it works, most other monsters (which are simpler) should too.
+Next step: api/DndApiClient.java
 
-## Architecture
+Your test currently reads JSON from a local file. This class does almost the same job, just pulling the JSON from the real API over HTTP instead of disk. Two responsibilities:
 
-The pipeline is split into three distinct stages executed sequentially:
+    Fetch the monster list — call https://www.dnd5eapi.co/api/2014/monsters, which returns a lightweight list of {index, name, url} for every monster (you'll want a small MonsterSummary class for this, since it's a different, smaller shape than full Monster)
+    Fetch one monster's full detail — call https://www.dnd5eapi.co/api/2014/monsters/{index} and deserialize it into Monster, exactly like your test just did, except the JSON comes from an HTTP response body instead of a File
 
-### 1. Extract (E)
-- Connects to the [D&D 5e API](https://www.dnd5eapi.co/).
-- Fetches the master index of monsters.
-- Iterates through the index to download the raw JSON payload for individual creatures.
+A few design questions worth settling before writing it:
+Want to write DndApiClient.java together now, or do a checklist first like we did for Monster.java?Checklist first
 
-### 2. Transform (T)
-- Utilizes JSON parsing libraries (e.g., Jackson or Gson) to map raw strings to Java objects.
-- **Flattening:** Extracts nested attributes (like reducing a complex `Speed` object into simple integer variables like `walkSpeed` and `flySpeed`).
-- **Cleaning:** Standardizes data types, handles null values gracefully, and drops unnecessary or redundant fields.
+Here's a checklist for DndApiClient.java, same format as the Monster.java one — what it needs to hold, what it needs to do, and what it should NOT do.
+1. What it needs to hold
 
-### 3. Load (L)
-- Connects to a local `bestiary.db` SQLite database using a JDBC driver.
-- Automatically creates the necessary SQL schemas if they do not exist.
-- Executes batch `INSERT` statements to populate the database with the transformed monster models.
+   A base URL constant — e.g. "https://www.dnd5eapi.co/api/2014" — so you're not hardcoding the full URL string in multiple places
+   A reusable HttpClient instance (from java.net.http.HttpClient) — you generally want to create one and reuse it across calls, not build a new one per request
+   A reusable Jackson ObjectMapper instance — same idea, one instance reused, since creating a new ObjectMapper per call is wasteful
 
-## Tech Stack
+2. What it needs to do
 
-* **Language:** Java
-* **Build Tool:** Maven
-* **Database:** SQLite
-* **Testing:** JUnit 5
-* **Libraries:** Gson / Jackson (JSON parsing), SQLite JDBC Driver
+Fetch the monster list
 
-## Getting Started
+    A method like List<MonsterSummary> fetchMonsterList() that calls GET /monsters
+    This needs a new, smaller model class — MonsterSummary — since the list endpoint returns only {index, name, url} per entry, not a full stat block. Don't reuse Monster for this; it's a genuinely different (smaller) shape.
+    The actual response wraps the array in an object ({ "count": N, "results": [...] }), so MonsterSummary fetching means deserializing into a small wrapper class, then pulling out .getResults()
 
-### Prerequisites
-* Java Development Kit (JDK) 11 or higher installed.
-* Maven installed and configured in your environment.
-* A standard terminal environment (PowerShell, bash, or Pop!_OS terminal).
+Fetch one monster's full detail
 
-### Installation & Execution
+    A method like Monster fetchMonsterDetail(String index) that calls GET /monsters/{index} and deserializes the response body straight into your existing Monster class — this is the exact same deserialization you already proved works, just fed by an HTTP response instead of a file
 
-## 1. **Clone the repository**
-Clone the repo:
-```bash
-   git clone [https://github.com/yourusername/dnd-bestiary-etl.git](https://github.com/yourusername/dnd-bestiary-etl.git)
-   cd dnd-bestiary-etl
-## 2. Build the project and run tests
+Handle the HTTP mechanics for both
 
-Compile the Java source files, resolve Maven dependencies, and execute the JUnit test suite to ensure the transformation logic is sound.
+    Build an HttpRequest with the right URL
+    Send it via HttpClient.send()
+    Check the response status code — a non-200 response (404, 500, etc.) shouldn't be treated as success; decide what happens then (throw an exception? return null? log and skip?)
+    Pass the response body string to Jackson's ObjectMapper.readValue() for deserialization
 
-```bash
-mvn clean install
-```
+3. Error handling responsibilities
 
-## 3. Run the Pipeline
+   Network failures (IOException, timeouts) — decide whether this class catches and handles them, or lets them bubble up to whoever calls it (SyncService). Generally: let exceptions propagate up, and let the caller decide what to do (e.g. SyncService catches it and falls back to "we're offline, use local data")
+   Malformed/unexpected JSON — same idea; a JsonProcessingException from Jackson should probably bubble up rather than being silently swallowed here
 
-Execute the main application class to trigger the ETL process.
+4. What this file should NOT do
 
-```bash
-mvn exec:java -Dexec.mainClass="za.co.wethinkcode.etl.ETLPipeline"
-```
+   No SQL, no MonsterDao calls — this class only knows about the API, not your database
+   No "is the app online" logic — that's ConnectivityChecker's job; DndApiClient just assumes it's allowed to try and lets failures speak for themselves
+   No decision-making about which monsters to fetch or when to sync — that orchestration belongs to SyncService. This class just exposes "give me the list" and "give me monster X" as tools for that orchestrator to call.
+   No UI-facing formatting/logic
 
-## 4. Verify the Data
-
-Once the pipeline finishes, a `bestiary.db` file will appear in your project root. You can open this using any standard SQLite viewer or via the command line:
-
-```bash
-sqlite3 bestiary.db
-sqlite> SELECT name, type, armor_speed FROM monsters LIMIT 5;
-```
-
-## Testing Strategy
-
-Data pipelines are only as good as their reliability. The `src/test/java` directory contains JUnit tests that simulate bad API responses. The tests guarantee that:
-
-- Missing keys in the JSON do not throw exceptions.
-- Numerical fields containing unexpected string data are safely caught.
-- The Object-Oriented models map perfectly to the expected SQL schema.
-
-## Future Expansions
-
-Once the core local pipeline is functional, potential next steps include:
-
-- **Scheduling:** Automating the execution to sync the database weekly.
-- **Logging:** Replacing standard output with a proper logging framework (like Logback/SLF4J) to track pipeline health.
-- **Cloud Migration:** Replacing SQLite with a cloud data warehouse like Google BigQuery or AWS RDS.
+One thing worth deciding before writing code: for fetchMonsterList(), do you want it to return the raw summaries (index/name/url only), or would it make more sense for this method to loop through and immediately call fetchMonsterDetail() for every single one, returning full Monster objects? I'd lean toward keeping them separate methods (list vs. detail) so SyncService can decide which monsters actually need full detail fetched (e.g. only new ones), rather than always fetching all ~300+ monsters' full data on every single sync. Want to lock that in as the approach, or talk through the trade-off more?
