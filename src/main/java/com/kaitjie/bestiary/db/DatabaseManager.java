@@ -1,8 +1,6 @@
 package com.kaitjie.bestiary.db;
 
 // imports will go here:
-import org.sqlite.SQLiteConnection;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -67,7 +65,7 @@ public class DatabaseManager {
                     intelligence INTEGER,
                     wisdom INTEGER,
                     charisma INTEGER,
-                    language TEXT,
+                    languages TEXT,
                     challenge_rating REAL,
                     proficiency_bonus INTEGER,
                     xp INTEGER,
@@ -173,7 +171,7 @@ public class DatabaseManager {
 
         // ---- 9. special_ability_damage ---- \\
         String special_ability_damage = """
-                CREATE TABLE IF NOT EXISTS special_abilities_damage(
+                CREATE TABLE IF NOT EXISTS special_ability_damage(
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     special_ability_id INTEGER NOT NULL REFERENCES special_abilities(id),
                     damage_type TEXT,
@@ -244,7 +242,7 @@ public class DatabaseManager {
         String legendary_action_damage = """
                 CREATE TABLE IF NOT EXISTS legendary_action_damage(
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    legendary_action_id INTEGER NOT NULL REFERENCES legendary_action(id),
+                    legendary_action_id INTEGER NOT NULL REFERENCES legendary_actions(id),
                     damage_type TEXT,
                     damage_dice TEXT
                     )
@@ -255,6 +253,7 @@ public class DatabaseManager {
 
 
     // ---- CLEANUP ----
-    // public method: closeConnection()
-    // closes the Connection field cleanly
+    public void closeConnection() throws SQLException{
+        this.connection.close();
+    }
 }
