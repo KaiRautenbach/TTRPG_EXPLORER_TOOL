@@ -2,7 +2,11 @@ package com.kaitjie.bestiary.db;
 
 import com.kaitjie.bestiary.model.*;
 
+import javax.swing.*;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class MonsterDao {
 
@@ -172,4 +176,214 @@ public class MonsterDao {
             ps.executeUpdate();
         }
     }
+
+    public List<Integer> insertAction(int monsterId, Monster monster) throws SQLException{
+        List<ActionEntry> actions = monster.getActions();
+        List<Integer> actionIds = new ArrayList<>();
+
+        String sql = "INSERT INTO actions " +
+                "(monster_id,name,desc,attack_bonus," +
+                "multiattack_type,dc_type,dc_value," +
+                "success_type,usage_type,usage_times) " +
+                "VALUES (?,?,?,?,?,?,?,?,?,?)";
+        for (ActionEntry action : actions){
+            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            Dc dc = action.getDc();
+            Usage usage = action.getUsage();
+            Integer attackBonus = action.getAttackBonus();
+
+            ps.setInt(1,monsterId);
+            ps.setString(2,action.getName());
+            ps.setString(3,action.getDesc());
+
+            if (attackBonus != null) {
+                ps.setInt(4, attackBonus);
+            } else {
+                ps.setNull(4, Types.INTEGER);
+            }
+
+            ps.setString(5, action.getMultiattackType());
+
+            if (dc != null) {
+                ps.setString(6, dc.getDcType().getName());
+                ps.setInt(7, dc.getDcValue());
+                ps.setString(8, dc.getSuccessType());
+            } else {
+                ps.setString(6, null);
+                ps.setInt(7, 0);
+                ps.setString(8, null);
+            }
+
+            if (usage != null) {
+                ps.setString(9, usage.getType());
+                ps.setInt(10, usage.getTimes());
+            } else {
+                ps.setString(9, null);
+                ps.setInt(10, 0);
+            }
+            ps.executeUpdate();
+
+            ResultSet rs = ps.getGeneratedKeys();
+            if (rs.next()) {
+                actionIds.add(rs.getInt(1));
+            } else {
+                throw new SQLException("Insert succeeded but no generated key was returned.");
+            }
+        }
+        return actionIds;
+    }
+
+    public void insertActionDamage(int actionId, ActionEntry action) throws SQLException{
+
+        String sql = "INSERT INTO action_damage (action_id, damage_type, damage_dice) VALUES (?,?,?)";
+
+        for (Damage d : action.getDamage()) {
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setInt(1, actionId);
+            ps.setString(2, d.getDamageType().getName());
+            ps.setString(3, d.getDamageDice());
+            ps.executeUpdate();
+        }
+    }
+
+    public void insertSubAction(int actionId, ActionEntry action) throws SQLException{
+
+        String sql = "INSERT INTO sub_actions " +
+                "(action_id,action_name,count,type) " +
+                "VALUES(?,?,?,?)";
+
+        for (SubAction subAction : action.getActions()){
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setInt(1,actionId);
+            ps.setString(2,subAction.getActionName());
+            ps.setString(3,subAction.getCount());
+            ps.setString(4, subAction.getType());
+            ps.executeUpdate();
+        }
+    }
+
+    public List<Integer> insertSpecialAbilities(int monsterId,Monster monster) throws SQLException{
+        List<SpecialAbility> specialAbilities = monster.getSpecialAbilities();
+        List<Integer> abilityIds = new ArrayList<>();
+
+        String sql = "INSERT INTO special_abilities (monster_id,name,desc,dc_type,dc_value,success_type,usage_type,usage_times) VALUES (?,?,?,?,?,?,?,?)";
+
+        for (SpecialAbility sp : specialAbilities){
+            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            Dc dc = sp.getDc();
+            Usage usage = sp.getUsage();
+
+            ps.setInt(1,monsterId);
+            ps.setString(2,sp.getName());
+            ps.setString(3,sp.getDesc());
+
+            if (dc != null) {
+                ps.setString(4, dc.getDcType().getName());
+                ps.setInt(5, dc.getDcValue());
+                ps.setString(6, dc.getSuccessType());
+            } else {
+                ps.setString(4, null);
+                ps.setInt(5, 0);
+                ps.setString(6, null);
+            }
+
+            if (usage != null) {
+                ps.setString(7, usage.getType());
+                ps.setInt(8, usage.getTimes());
+            } else {
+                ps.setString(7, null);
+                ps.setInt(8, 0);
+            }
+            ps.executeUpdate();
+
+            ResultSet rs = ps.getGeneratedKeys();
+            if (rs.next()) {
+                abilityIds.add(rs.getInt(1));
+            } else {
+                throw new SQLException("Insert succeeded but no generated key was returned.");
+            }
+        }
+        return abilityIds;
+    }
+
+    public void insertSpecialAbilityDamage(int abilityId, SpecialAbility ability) throws SQLException{
+        String sql = "INSERT INTO special_ability_damage (special_ability_id, damage_type, damage_dice) VALUES (?,?,?)";
+
+        for (Damage d : ability.getDamage()) {
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setInt(1, abilityId);
+            ps.setString(2, d.getDamageType().getName());
+            ps.setString(3, d.getDamageDice());
+            ps.executeUpdate();
+        }
+    }
+
+    public List<Integer> insertLegendaryAction(int monsterId, Monster monster) throws SQLException{
+        List<ActionEntry> legendaryActions = monster.getLegendaryActions();
+        List<Integer> lActionIds = new ArrayList<>();
+
+        String sql = "INSERT INTO legendary_actions " +
+                "(monster_id,name,desc,attack_bonus," +
+                "dc_type,dc_value," +
+                "success_type,usage_type,usage_times) " +
+                "VALUES (?,?,?,?,?,?,?,?,?)";
+
+        for (ActionEntry lAction : legendaryActions){
+            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            Dc dc = lAction.getDc();
+            Usage usage = lAction.getUsage();
+            Integer attackBonus = lAction.getAttackBonus();
+
+            ps.setInt(1,monsterId);
+            ps.setString(2,lAction.getName());
+            ps.setString(3,lAction.getDesc());
+
+            if (attackBonus != null) {
+                ps.setInt(4, attackBonus);
+            } else {
+                ps.setNull(4, Types.INTEGER);
+            }
+
+            if (dc != null) {
+                ps.setString(5, dc.getDcType().getName());
+                ps.setInt(6, dc.getDcValue());
+                ps.setString(7, dc.getSuccessType());
+            } else {
+                ps.setString(5, null);
+                ps.setInt(6, 0);
+                ps.setString(7, null);
+            }
+
+            if (usage != null) {
+                ps.setString(8, usage.getType());
+                ps.setInt(9, usage.getTimes());
+            } else {
+                ps.setString(8, null);
+                ps.setInt(9, 0);
+            }
+            ps.executeUpdate();
+
+            ResultSet rs = ps.getGeneratedKeys();
+            if (rs.next()) {
+                lActionIds.add(rs.getInt(1));
+            } else {
+                throw new SQLException("Insert succeeded but no generated key was returned.");
+            }
+        }
+        return lActionIds;
+    }
+
+    public void insertLegendaryActionDamage(int lActionId, ActionEntry lAction) throws SQLException{
+        String sql = "INSERT INTO legendary_action_damage (legendary_action_id, damage_type, damage_dice) VALUES (?,?,?)";
+
+        for (Damage d : lAction.getDamage()) {
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setInt(1, lActionId);
+            ps.setString(2, d.getDamageType().getName());
+            ps.setString(3, d.getDamageDice());
+            ps.executeUpdate();
+        }
+    }
 }
+
+
