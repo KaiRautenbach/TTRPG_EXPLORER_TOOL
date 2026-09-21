@@ -16,6 +16,84 @@ public class MonsterDao {
         this.connection = dbManager.getConnection();
     }
 
+    public void saveFullMonster(Monster monster) throws SQLException {
+
+        try {
+            connection.setAutoCommit(false);
+
+            int monsterId = insertMonster(monster);
+
+            // ---- simple child tables ----
+            if (monster.getArmorClass() != null) {
+                insertArmorClasses(monsterId, monster);
+            }
+            if (monster.getProficiencies() != null) {
+                insertProficiencies(monsterId, monster);
+            }
+            if (monster.getDamageVulnerabilities() != null) {
+                insertDamageVulnerabilities(monsterId, monster);
+            }
+            if (monster.getDamageResistances() != null) {
+                insertDamageResistance(monsterId, monster);
+            }
+            if (monster.getDamageImmunities() != null) {
+                insertDamageImmunities(monsterId, monster);
+            }
+            if (monster.getConditionImmunities() != null) {
+                insertConditionImmunities(monsterId, monster);
+            }
+
+            // ---- special abilities + their damage ----
+            List<SpecialAbility> abilities = monster.getSpecialAbilities();
+            if (abilities != null) {
+                List<Integer> abilityIds = insertSpecialAbilities(monsterId, monster);
+                for (int i = 0; i < abilities.size(); i++) {
+                    SpecialAbility ability = abilities.get(i);
+                    if (ability.getDamage() != null) {
+                        insertSpecialAbilityDamage(abilityIds.get(i), ability);
+                    }
+                }
+            }
+
+            // ---- actions + damage + sub-actions ----
+            List<ActionEntry> actions = monster.getActions();
+            if (actions != null) {
+                List<Integer> actionIds = insertAction(monsterId, monster);
+                for (int i = 0; i < actions.size(); i++) {
+                    ActionEntry action = actions.get(i);
+                    int actionId = actionIds.get(i);
+
+                    if (action.getDamage() != null) {
+                        insertActionDamage(actionId, action);
+                    }
+                    if (action.getActions() != null) {
+                        insertSubAction(actionId, action);
+                    }
+                }
+            }
+
+            // ---- legendary actions + damage ----
+            List<ActionEntry> legendaryActions = monster.getLegendaryActions();
+            if (legendaryActions != null) {
+                List<Integer> legendaryIds = insertLegendaryAction(monsterId, monster);
+                for (int i = 0; i < legendaryActions.size(); i++) {
+                    ActionEntry lAction = legendaryActions.get(i);
+                    if (lAction.getDamage() != null) {
+                        insertLegendaryActionDamage(legendaryIds.get(i), lAction);
+                    }
+                }
+            }
+
+            connection.commit();
+
+        } catch (SQLException e) {
+            connection.rollback();
+            throw e;
+        } finally {
+            connection.setAutoCommit(true);
+        }
+    }
+
     public int insertMonster(Monster monster) throws SQLException {
         Speed speed = monster.getSpeed();
         Senses senses = monster.getSenses();
@@ -383,6 +461,123 @@ public class MonsterDao {
             ps.setString(3, d.getDamageDice());
             ps.executeUpdate();
         }
+    }
+
+    public Monster getMonsterByIndex(String index) throws SQLException {
+
+        // ---- STEP 1: fetch the core monster row ----
+        // build SELECT * FROM monsters WHERE monster_index = ?
+        // prepareStatement, set the index param, executeQuery()
+        // if no row found (rs.next() is false): decide what to return (null? throw?)
+        // if found: create a new Monster object, read every column by name,
+        //           call the matching setX() for each
+        // capture the row's "id" column into a local variable — you'll need it
+        // for every query below
+        String sql = "SELECT * FROM monsters WHERE monster_index = ?";
+        PreparedStatement ps = connection.prepareStatement(sql);
+        ps.setString(1,index);
+
+        ResultSet rs = ps.executeQuery();
+
+        if (rs.next()){
+            int ref = rs.getInt("id");
+            Monster monster = new Monster();
+            monster.setIndex(rs.getString("monster_index"));
+            monster.setName(rs.getString("name"));
+            monster.setSize(rs.getString("size"));
+            monster.setType(rs.getString("type"));
+            monster.setAlignment(rs.getString("alignment"));
+            monster.setHitPoints(rs.getInt("hit_points"));
+            monster.setHitDice(rs.getString("hit_dice"));
+            monster.setHitPointsRoll(rs.getString("hit_points_roll"));
+            monster.setStrength(rs.getInt("strength"));
+            monster.setDexterity(rs.getInt("dexterity"));
+            monster.setConstitution(rs.getInt("constitution"));
+            monster.setIntelligence(rs.getInt("intelligence"));
+            monster.setWisdom(rs.getInt("wisdom"));
+            monster.setCharisma(rs.getInt("charisma"));
+            monster.setLanguages(rs.getString("languages"));
+            monster.setChallengeRating(rs.getDouble("challenge_rating"));
+            monster.setProficiencyBonus(rs.getInt("proficiency_bonus"));
+            monster.setXp(rs.getInt("xp"));
+            monster.setImage(rs.getString("image"));
+            monster.setUrl(rs.getString("url"));
+            monster.setLastUpdated(rs.getString("last_updated"));
+
+            Speed speed = new Speed();
+            speed.setWalk(rs.getString("speed_walk"));
+            speed.setFly(rs.getString("speed_fly"));
+            speed.setSwim(rs.getString("speed_swim"));
+            speed.setClimb(rs.getString("speed_climb"));
+            speed.setBurrow(rs.getString("speed_burrow"));
+            speed.setHover(rs.getInt("speed_hover") == 1);
+            monster.setSpeed(speed);
+
+            Senses senses = new Senses();
+            senses.setBlindSight(rs.getString("blindsight"));
+            senses.setTremorSense(rs.getString("tremorsense"));
+            senses.setDarkVision(rs.getString("darkvision"));
+            senses.setTrueSight(rs.getString("truesight"));
+            senses.setPassivePerception(rs.getInt("passive_perception"));
+            monster.setSenses(senses);
+
+            return monster;
+        }else{
+            return null;
+        }
+
+        // ---- STEP 2: simple one-to-many tables (no nested objects) ----
+        // for each of: armor_classes, proficiencies,
+        //              damage_vulnerabilities, damage_resistances,
+        //              damage_immunities, condition_immunities
+        //   - SELECT * FROM <table> WHERE monster_id = ?
+        //   - while (rs.next()): build the object (ArmorClass / Proficiency / String),
+        //     add to a List
+        //   - call monster.setX(thatList)
+
+
+        // ---- STEP 3: special_abilities (has a nested damage list) ----
+        // SELECT * FROM special_abilities WHERE monster_id = ?
+        // while (rs.next()):
+        //   - build a SpecialAbility from this row
+        //   - capture this row's "id" (the special_ability's own id)
+        //   - run a SECOND query: SELECT * FROM special_ability_damage
+        //     WHERE special_ability_id = ?
+        //   - while (rs2.next()): build Damage objects, add to a list
+        //   - attach that damage list to the SpecialAbility
+        //   - add the finished SpecialAbility to an outer list
+        // monster.setSpecialAbilities(thatOuterList)
+
+
+        // ---- STEP 4: actions (has TWO nested lists: damage AND sub_actions) ----
+        // same shape as Step 3, but for each action row, run two extra
+        // nested queries instead of one:
+        //   - action_damage WHERE action_id = ?
+        //   - sub_actions WHERE action_id = ?
+        // monster.setActions(thatOuterList)
+
+
+        // ---- STEP 5: legendary_actions (same shape as special_abilities) ----
+        // SELECT * FROM legendary_actions WHERE monster_id = ?
+        // nested query: legendary_action_damage WHERE legendary_action_id = ?
+        // monster.setLegendaryActions(thatOuterList)
+
+
+        // ---- STEP 6: return the fully assembled monster ----
+        // return monster;
+    }
+    public List<String> getAllMonsterIndexes() throws SQLException {
+        List<String> indexes = new ArrayList<>();
+
+        String sql = "SELECT monster_index FROM monsters";
+        PreparedStatement ps = connection.prepareStatement(sql);
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            indexes.add(rs.getString("monster_index"));
+        }
+
+        return indexes;
     }
 }
 
