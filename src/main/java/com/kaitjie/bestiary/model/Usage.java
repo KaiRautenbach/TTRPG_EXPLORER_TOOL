@@ -1,5 +1,8 @@
 package com.kaitjie.bestiary.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Usage {
     private String type;
     private Integer times;

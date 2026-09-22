@@ -46,7 +46,7 @@ public class Monster {
     private List<String> damageImmunities;
 
     @JsonProperty("condition_immunities")
-    private List<String> conditionImmunities;
+    private List<ApiRef> conditionImmunities;
 
     private Senses senses;
 
@@ -158,7 +158,7 @@ public class Monster {
         return damageImmunities;
     }
 
-    public List<String> getConditionImmunities() {
+    public List<ApiRef> getConditionImmunities() {
         return conditionImmunities;
     }
 
@@ -289,7 +289,7 @@ public class Monster {
         this.damageImmunities = damageImmunities;
     }
 
-    public void setConditionImmunities(List<String> conditionImmunities) {
+    public void setConditionImmunities(List<ApiRef> conditionImmunities) {
         this.conditionImmunities = conditionImmunities;
     }
 

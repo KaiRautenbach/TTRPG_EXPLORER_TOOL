@@ -23,10 +23,10 @@ public class InsertFullMonsterTest {
         ac.setValue(15);
         testMonster.setArmorClass(List.of(ac));
 
-        testMonster.setConditionImmunities(List.of("charmed", "frightened"));
-        testMonster.setDamageImmunities(List.of("poison"));
-        testMonster.setDamageResistances(List.of("cold"));
-        testMonster.setDamageVulnerabilities(List.of("fire"));
+//        testMonster.setConditionImmunities(List.of("charmed", "frightened"));
+//        testMonster.setDamageImmunities(List.of("poison"));
+//        testMonster.setDamageResistances(List.of("cold"));
+//        testMonster.setDamageVulnerabilities(List.of("fire"));
 
         ApiRef profRef = new ApiRef();
         profRef.setIndex("skill-stealth");

@@ -1,7 +1,9 @@
 package com.kaitjie.bestiary.model;
 
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.util.List;
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SpecialAbility {
     private String name;
     private String desc;

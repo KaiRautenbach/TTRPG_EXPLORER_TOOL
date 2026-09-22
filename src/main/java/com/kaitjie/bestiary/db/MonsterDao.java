@@ -196,10 +196,10 @@ public class MonsterDao {
 
         String sql = "INSERT INTO condition_immunities(monster_id, value) VALUES (?,?)";
 
-        for (String condition : monster.getConditionImmunities()){
+        for (ApiRef condition : monster.getConditionImmunities()){
             PreparedStatement ps = connection.prepareStatement(sql);
             ps.setInt(1,monsterId);
-            ps.setString(2,condition);
+            ps.setString(2,condition.getName());
             ps.executeUpdate();
         }
     }
@@ -235,7 +235,7 @@ public class MonsterDao {
         for (String vulnerabilities : monster.getDamageVulnerabilities()){
             PreparedStatement ps = connection.prepareStatement(sql);
             ps.setInt(1, monsterId);
-            ps.setString(2,vulnerabilities);
+            ps.setString(2, vulnerabilities);
             ps.executeUpdate();
         }
     }
@@ -294,7 +294,12 @@ public class MonsterDao {
 
             if (usage != null) {
                 ps.setString(9, usage.getType());
-                ps.setInt(10, usage.getTimes());
+                Integer times = usage.getTimes();
+                if (times != null) {
+                    ps.setInt(10, times);
+                } else {
+                    ps.setNull(10, Types.INTEGER);
+                }
             } else {
                 ps.setString(9, null);
                 ps.setInt(10, 0);
@@ -318,7 +323,14 @@ public class MonsterDao {
         for (Damage d : action.getDamage()) {
             PreparedStatement ps = connection.prepareStatement(sql);
             ps.setInt(1, actionId);
-            ps.setString(2, d.getDamageType().getName());
+
+            ApiRef damageType = d.getDamageType();
+            if (damageType != null) {
+                ps.setString(2, damageType.getName());
+            } else {
+                ps.setString(2, null);
+            }
+
             ps.setString(3, d.getDamageDice());
             ps.executeUpdate();
         }
@@ -367,7 +379,12 @@ public class MonsterDao {
 
             if (usage != null) {
                 ps.setString(7, usage.getType());
-                ps.setInt(8, usage.getTimes());
+                Integer times = usage.getTimes();
+                if (times != null) {
+                    ps.setInt(8, times);
+                } else {
+                    ps.setNull(8, Types.INTEGER);
+                }
             } else {
                 ps.setString(7, null);
                 ps.setInt(8, 0);
@@ -390,7 +407,14 @@ public class MonsterDao {
         for (Damage d : ability.getDamage()) {
             PreparedStatement ps = connection.prepareStatement(sql);
             ps.setInt(1, abilityId);
-            ps.setString(2, d.getDamageType().getName());
+
+            ApiRef damageType = d.getDamageType();
+            if (damageType != null) {
+                ps.setString(2, damageType.getName());
+            } else {
+                ps.setString(2, null);
+            }
+
             ps.setString(3, d.getDamageDice());
             ps.executeUpdate();
         }
@@ -434,7 +458,12 @@ public class MonsterDao {
 
             if (usage != null) {
                 ps.setString(8, usage.getType());
-                ps.setInt(9, usage.getTimes());
+                Integer times = usage.getTimes();
+                if (times != null) {
+                    ps.setInt(9, times);
+                } else {
+                    ps.setNull(9, Types.INTEGER);
+                }
             } else {
                 ps.setString(8, null);
                 ps.setInt(9, 0);
@@ -457,7 +486,14 @@ public class MonsterDao {
         for (Damage d : lAction.getDamage()) {
             PreparedStatement ps = connection.prepareStatement(sql);
             ps.setInt(1, lActionId);
-            ps.setString(2, d.getDamageType().getName());
+
+            ApiRef damageType = d.getDamageType();
+            if (damageType != null) {
+                ps.setString(2, damageType.getName());
+            } else {
+                ps.setString(2, null);
+            }
+
             ps.setString(3, d.getDamageDice());
             ps.executeUpdate();
         }
