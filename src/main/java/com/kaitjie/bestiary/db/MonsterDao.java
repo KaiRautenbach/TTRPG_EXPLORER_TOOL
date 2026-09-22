@@ -615,6 +615,21 @@ public class MonsterDao {
 
         return indexes;
     }
+
+    public List<MonsterSummary> getAllMonsterSummaries() throws SQLException {
+        List<MonsterSummary> summaries = new ArrayList<>();
+        String sql = "SELECT monster_index, name FROM monsters ORDER BY name";
+        PreparedStatement ps = connection.prepareStatement(sql);
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            MonsterSummary summary = new MonsterSummary();
+            summary.setIndex(rs.getString("monster_index"));
+            summary.setName(rs.getString("name"));
+            summaries.add(summary);
+        }
+        return summaries;
+    }
 }
 
 
